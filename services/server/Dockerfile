@@ -2,8 +2,9 @@ FROM python:3
 
 WORKDIR /app
 
-COPY server.py .
-COPY requirements.txt .
+COPY ./postgres/postgres.py .
+COPY ./services/server/server.py .
+COPY ./services/server/requirements.txt .
 
 RUN pip install --ignore-installed -r requirements.txt
 

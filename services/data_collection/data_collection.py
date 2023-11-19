@@ -3,7 +3,7 @@ import time
 import requests
 import json
 import psycopg2
-import os
+import postgres
 
 """
 This job collects impressions data for each registered user once a day.
@@ -18,82 +18,23 @@ FLOOR_CODES = {
     12: '23876'
 }
 
-def connect_db():
-    try:
-        conn = psycopg2.connect(
-            host=os.getenv('POSTGRES_HOST'),
-            port=5432,
-            database='zerocater',
-            user=os.getenv('POSTGRES_USER'),
-            password=os.getenv('POSTGRES_PASSWORD'),
-        )
-    except Exception as e:
-        print('failed to connect to postgres.', e)
-        sys.exit(1)
+pg = postgres.PostgresClient()
 
-    """
-    notes:
-    need to determine which of username or date should be primary key
-    this job updates the table by user
-    with heuristic-based food recommendation, we will get all of a user's past orders in the last 30 days
-        and rank them by rating. then we will pick food according to that. so it is by user, then by date.
-    with model-based food recommendation, we will first train on all impressions within the last 30 days.
-        then for a specific user, we will evaluate all of the candidates meals of each day and pick the
-        highest-rated one. so it is by date, then user.
-    """
-
-    cur = conn.cursor()
-    try:
-        cur.execute("create table if not exists impressions (date text, username text, item_id integer, rating integer, PRIMARY KEY (date, username, item_id))")
-        conn.commit()
-        cur.execute("create table if not exists items (item_id integer PRIMARY KEY, idx integer)")
-        conn.commit()
-        cur.close()
-    
-        return conn
-    except Exception as e:
-        cur.close()
-        conn.rollback()
-        print('failed to create table.', e)
-        sys.exit(1)
-
-conn = connect_db()
-
-def get_users_tokens():
-    cur = conn.cursor()
-    try:
-        cur.execute(f"select * from users")
-        rows = cur.fetchall()
-        cur.close()
-        return rows
-    except:
-        cur.close()
-        conn.rollback()
-        return None
+def get_users():
+    rows, err = pg.execute_read("select * from users")
+    return rows if not err else None
 
 def record_item(item_id):
-    cur = conn.cursor()
-    try:
-        cur.execute(f"select count(*) from items")
-        rows = cur.fetchall()
+    rows, err = pg.execute_read("select count(*) from items")
+    if err: return
+    if len(rows) > 0 and len(rows[0]) > 0:
         num_rows = rows[0][0]
+    else: return
 
-        cur.execute(f"insert into items values ({item_id},{num_rows})")
-        conn.commit()
-        cur.close()
-    except:
-        cur.close()
-        conn.rollback()
+    err = pg.execute_writes([f"insert into items values ({item_id},{num_rows})"])
 
 def record_impression(date, username, item_id, rating):
-    cur = conn.cursor()
-    try:
-        cur.execute(f"insert into impressions values ('{date}','{username}',{item_id},{rating}) on conflict(date, username, item_id) do update set rating = {rating}")
-        conn.commit()
-        cur.close()
-    except Exception as e:
-        cur.close()
-        conn.rollback()
+    err = pg.execute_writes([f"insert into impressions values ('{date}','{username}',{item_id},{rating}) on conflict(date, username, item_id) do update set rating = {rating}"])
 
 def http(type, endpoint, token, **kwargs):
     if type == 'GET':
@@ -149,7 +90,7 @@ def get_user_item_feedback(token, meal_id):
 
 def run():
     # get the most recent (username, token) pair for each username in the users table
-    user_token_list = get_users_tokens()
+    user_token_list = get_users()
     if not user_token_list:
         return
     
@@ -177,24 +118,26 @@ def run():
                             record_impression(sm_date, username, item_id, 1 if feedback['is_positive'] else -1)
 
 if __name__ == "__main__":
-    prev_date = ""
-    # while True:
-    #     cur_dt = dt.datetime.now()
-    #     cur_date = f"{cur_dt.year}{cur_dt.month}{cur_dt.day}"
-    #     while cur_date == prev_date:
-    #         time.sleep(600) # sleep 10 minutes
-    #         cur_dt = dt.datetime.now()
-    #         cur_date = f"{cur_dt.year}{cur_dt.month}{cur_dt.day}"
-    #     prev_date = cur_date
+    test = True
 
-        # run the job here
-    
-    # delay for testing
-    uts = get_users_tokens()
-    while not uts:
-        time.sleep(5)
-        uts = get_users_tokens()
-        
-    run()
+    if test:
+        # run once when users are ready
+        uts = get_users()
+        while not uts:
+            time.sleep(5)
+            uts = get_users()
+            
+        run()
+    else:
+        # run once a day, checking at 10 minute intervals
+        prev_date = ""
+        while True:
+            cur_dt = dt.datetime.now()
+            cur_date = f"{cur_dt.year}{cur_dt.month}{cur_dt.day}"
+            while cur_date == prev_date:
+                time.sleep(600) # sleep 10 minutes
+                cur_dt = dt.datetime.now()
+                cur_date = f"{cur_dt.year}{cur_dt.month}{cur_dt.day}"
+            prev_date = cur_date
 
-
+            run()

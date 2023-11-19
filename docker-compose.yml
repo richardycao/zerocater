@@ -1,28 +1,5 @@
 version: "3.8"
 services:
-  server:
-    container_name: server
-    build: ./server
-    ports:
-      - "3001:3001"
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_HOST=postgres # For localdev, this should be the same as the service, 'postgres'. https://stackoverflow.com/questions/70051611/connect-to-postgres-container-from-another-running-container
-      - PORT=3001
-    depends_on:
-      postgres:
-        condition: service_healthy
-  data_collection:
-    container_name: data_collection
-    build: ./data_collection
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_HOST=postgres # For localdev, this should be the same as the service, 'postgres'. https://stackoverflow.com/questions/70051611/connect-to-postgres-container-from-another-running-container
-    depends_on:
-      postgres:
-        condition: service_healthy
   postgres:
     container_name: postgres
     image: postgres:14.5
@@ -40,5 +17,47 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+  setup:
+    container_name: setup
+    build:
+      context: ./
+      dockerfile: ./services/setup/Dockerfile
+    logging:
+      driver: "none"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -X GET http://localhost:3000"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+  server:
+    container_name: server
+    build: 
+      context: ./
+      dockerfile: ./services/server/Dockerfile
+    ports:
+      - "3001:3001"
+    depends_on:
+      setup:
+        condition: service_healthy
+  data_collection:
+    container_name: data_collection
+    build:
+      context: ./
+      dockerfile: ./services/data_collection/Dockerfile
+    depends_on:
+      setup:
+        condition: service_healthy
+  order_meals:
+    container_name: order_meals
+    build:
+      context: ./
+      dockerfile: ./services/order_meals/Dockerfile
+    depends_on:
+      setup:
+        condition: service_healthy
+  
 volumes:
   postgres_db:
