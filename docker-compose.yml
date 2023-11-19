@@ -13,6 +13,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  data_collection:
+    container_name: data_collection
+    build: ./data_collection
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_HOST=postgres # For localdev, this should be the same as the service, 'postgres'. https://stackoverflow.com/questions/70051611/connect-to-postgres-container-from-another-running-container
+    depends_on:
+      postgres:
+        condition: service_healthy
   postgres:
     container_name: postgres
     image: postgres:14.5
