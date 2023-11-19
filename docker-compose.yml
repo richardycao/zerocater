@@ -1,0 +1,34 @@
+version: "3.8"
+services:
+  server:
+    container_name: server
+    build: ./server
+    ports:
+      - "3001:3001"
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_HOST=postgres # For localdev, this should be the same as the service, 'postgres'. https://stackoverflow.com/questions/70051611/connect-to-postgres-container-from-another-running-container
+      - PORT=3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    container_name: postgres
+    image: postgres:14.5
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=zerocater
+    volumes:
+      - postgres_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d zerocater"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+volumes:
+  postgres_db:
