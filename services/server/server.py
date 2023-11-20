@@ -62,12 +62,30 @@ def get_impressions_by_user():
     
     return jsonify({"message": str(rows)})
 
+# get all users (testing)
+@app.route("/all_users", methods=['GET'])
+def get_all_users():
+    rows, err = pg.execute_read("select * from users")
+    if err:
+        return jsonify({"error": "failed to get all users"})
+    
+    return jsonify({"message": str(rows)})
+
+# get all impressions (testing)
+@app.route("/all_impressions", methods=['GET'])
+def get_all_items():
+    rows, err = pg.execute_read("select * from impressions")
+    if err:
+        return jsonify({"error": "failed to get all impressions"})
+    
+    return jsonify({"message": str(rows)})
+
 # get all items (testing)
-@app.route("/items", methods=['GET'])
-def get_items():
+@app.route("/all_items", methods=['GET'])
+def get_all_items():
     rows, err = pg.execute_read("select * from items")
     if err:
-        return jsonify({"error": "failed to get items"})
+        return jsonify({"error": "failed to get all items"})
     
     return jsonify({"message": str(rows)})
     

@@ -21,8 +21,7 @@ FLOOR_CODES = {
 pg = postgres.PostgresClient()
 
 def get_users():
-    rows, err = pg.execute_read("select * from users")
-    return rows if not err else None
+    return pg.execute_read("select * from users")
 
 def record_item(item_id):
     rows, err = pg.execute_read("select count(*) from items")
@@ -43,10 +42,8 @@ def http(type, endpoint, token, **kwargs):
 
 def get_scheduled_meals(token, floor_code):
     today = dt.datetime.now()
-    lower_dt = today + dt.timedelta(days=-30)
-    upper_dt = today + dt.timedelta(days=0)
-    start = f'{lower_dt.year}-{lower_dt.month}-{lower_dt.day}'
-    end = f'{upper_dt.year}-{upper_dt.month}-{upper_dt.day}'
+    start = (today + dt.timedelta(days=-30)).strftime('%Y-%m-%d')
+    end = (today + dt.timedelta(days=0)).strftime('%Y-%m-%d')
 
     try:
         res = http('GET', '/cloud_cafe/meals', token, start=start, end=end, address_id=floor_code)
@@ -90,9 +87,8 @@ def get_user_item_feedback(token, meal_id):
 
 def run():
     # get the most recent (username, token) pair for each username in the users table
-    user_token_list = get_users()
-    if not user_token_list:
-        return
+    user_token_list, err = get_users()
+    if err: return
     
     for username, token, _, _ in user_token_list:
         for floor, floor_code in FLOOR_CODES.items():
@@ -122,22 +118,20 @@ if __name__ == "__main__":
 
     if test:
         # run once when users are ready
-        uts = get_users()
-        while not uts:
+        users, err = get_users()
+        while err:
             time.sleep(5)
-            uts = get_users()
+            users, err = get_users()
             
         run()
     else:
         # run once a day, checking at 10 minute intervals
         prev_date = ""
         while True:
-            cur_dt = dt.datetime.now()
-            cur_date = f"{cur_dt.year}{cur_dt.month}{cur_dt.day}"
+            cur_date = dt.datetime.now().strftime('%Y%m%d')
             while cur_date == prev_date:
                 time.sleep(600) # sleep 10 minutes
-                cur_dt = dt.datetime.now()
-                cur_date = f"{cur_dt.year}{cur_dt.month}{cur_dt.day}"
+                cur_date = dt.datetime.now().strftime('%Y%m%d')
             prev_date = cur_date
 
             run()
