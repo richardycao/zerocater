@@ -56,6 +56,9 @@ def run():
 
         # get meals over the next 3 weeks
 
+        # challenge - find out which meals are mains and which are sides
+        # if it can order more than 1 thing, 
+
 
 
 
